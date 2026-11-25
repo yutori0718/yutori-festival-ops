@@ -13,7 +13,13 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
       - run: npm ci
       - run: npm run lint
       - run: npm test
       - run: npm run build
+      - run: npx firebase emulators:exec --only firestore --project demo-yutori-ops "node --test tests/security-emulator.mjs"
+
