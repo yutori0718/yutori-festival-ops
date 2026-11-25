@@ -25,3 +25,12 @@ jobs:
 
       - run: npx playwright install --with-deps chromium
       - run: npx firebase emulators:exec --only auth,firestore --project demo-yutori-ops "npx playwright test"
+
+  deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.RELEASE_READY == 'true'
+    needs: verify
+    uses: ./.github/workflows/deploy.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
