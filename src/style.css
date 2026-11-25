@@ -3,3 +3,5 @@
 .board{display:grid;grid-template-columns:repeat(6,minmax(150px,1fr));gap:12px;overflow:auto}.board-card{display:block;width:100%;margin:8px 0;background:#203b52;color:#f8fafc;text-align:left}.board-card small{display:block;margin-top:8px;color:#aec0ce}progress{width:100%;accent-color:#24dfef}
 
 .stage-field{display:grid;grid-template-columns:2fr 1fr;gap:8px;margin:12px 0}.stage-field label{display:grid;gap:4px}details label{margin:8px 0}
+
+.toolbar{flex-wrap:wrap}.toolbar input{max-width:230px}

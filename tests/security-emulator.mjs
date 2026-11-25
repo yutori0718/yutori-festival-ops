@@ -94,3 +94,10 @@ test('大会準備データは会員だけが読み、管理者だけが変更�
  await assertFails(updateDoc(ref(member,`events/${event}/operationalRecords/r1`),{title:'bad',revision:2,updatedBy:'member',updatedAt:serverTimestamp()}));
  await assertFails(getDoc(ref(env.unauthenticatedContext().firestore(),`events/${event}/operationalRecords/r1`)));
 });
+
+test('追加のタスク詳細とステージ詳細は管理者のみ変更できる',async()=>{
+ const admin=env.authenticatedContext('admin').firestore(), member=env.authenticatedContext('member').firestore();
+ await assertSucceeds(setDoc(ref(admin,`events/${event}/tasks/metadata`),{...task(),metadata:'{}'}));
+ await assertFails(updateDoc(ref(member,`events/${event}/tasks/metadata`),{metadata:'{"visibility":"参加者向け"}',revision:2,updatedBy:'member',updatedAt:serverTimestamp()}));
+ await assertSucceeds(updateDoc(ref(admin,`events/${event}/tasks/metadata`),{metadata:'{"category":"準備"}',revision:2,updatedBy:'admin',updatedAt:serverTimestamp()}));
+});
