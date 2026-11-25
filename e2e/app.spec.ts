@@ -48,3 +48,39 @@ test('バックアップを復元して再実行しても重複を作らない',
  await page.getByRole('button',{name:'JSON を出力'}).click();
  expect((await download).suggestedFilename()).toBe('operations-backup.json');
 });
+
+
+test('開始と終了を保存して締切・開催日と区別して表示する',async({page})=>{
+ await page.goto('/yutori-festival-ops/#/admin');
+ await page.getByRole('button',{name:'テスト用ログイン'}).click();
+ await page.getByLabel('大会 ID').fill('e2e');
+ await page.getByRole('button',{name:'接続'}).click();
+ await page.getByRole('link',{name:'全タスク',exact:true}).click();
+ await page.getByLabel('タスク名').fill('期間検証タスク');
+ await page.getByLabel('開始予定日',{exact:true}).fill('2027-02-01');
+ await page.getByLabel('終了予定日',{exact:true}).fill('2027-02-03');
+ await page.getByLabel('期限',{exact:true}).fill('2027-02-05');
+ await page.getByRole('button',{name:'保存',exact:true}).click();
+ await expect(page.getByRole('button',{name:/期間検証タスク/})).toBeVisible();
+ await page.getByRole('link',{name:'大会ステージ',exact:true}).click();
+ await page.getByLabel('ステージ名').fill('準備期間検証ステージ');
+ await page.getByLabel('準備開始日',{exact:true}).fill('2027-01-25');
+ await page.getByLabel('準備終了予定日',{exact:true}).fill('2027-02-02');
+ await page.getByLabel('開催日（未定の場合は空欄）',{exact:true}).fill('2027-02-07');
+ await page.getByRole('button',{name:'保存',exact:true}).click();
+ await expect(page.getByRole('button',{name:/準備期間検証ステージ/})).toBeVisible();
+ await page.getByRole('link',{name:'ガントチャート',exact:true}).click();
+ await page.reload();
+ const task=page.locator('.timeline-row').filter({has:page.getByRole('button',{name:'期間検証タスク',exact:true})});
+ const stage=page.locator('.timeline-row').filter({has:page.getByRole('button',{name:'準備期間検証ステージ',exact:true})});
+ await expect(task).toContainText('開始 2027-02-01 / 終了 2027-02-03');
+ await expect(task).toContainText('締切 2027-02-05');
+ await expect(stage).toContainText('開始 2027-01-25 / 終了 2027-02-02');
+ await expect(stage).toContainText('開催日 2027-02-07');
+ await expect(task.locator('.timeline-period')).toBeVisible();
+ await expect(stage.locator('.timeline-milestone')).toBeVisible();
+ await page.setViewportSize({width:390,height:844});
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+ await page.getByRole('button',{name:'準備期間検証ステージ',exact:true}).click();
+ await expect(page.getByLabel('準備終了予定日',{exact:true})).toHaveValue('2027-02-02');
+});
