@@ -43,12 +43,12 @@ service cloud.firestore {
     }
     function validRecord(event) {
       let d = request.resource.data;
-      return d.keys().hasOnly(['eventId','category','title','status','certainty','date','details','url','archived','revision','createdBy','createdAt','updatedBy','updatedAt'])
+      return d.keys().hasOnly(['eventId','category','title','status','certainty','date','details','url','attributes','archived','revision','createdBy','createdAt','updatedBy','updatedAt'])
         && d.keys().hasAll(['eventId','category','title','status','certainty','date','details','url','archived','revision','createdBy','createdAt','updatedBy','updatedAt'])
         && d.eventId == event && d.category in ['schedule','recruitment','selections','invitations','videos','prizes','rules']
         && d.title is string && d.title.size() > 0 && d.title.size() <= 200 && d.status in ['未着手','対応中','確認待ち','承認待ち','完了','保留']
         && d.certainty in ['未確定','予定','確定'] && d.date is string && d.date.size() <= 10 && d.details is string && d.details.size() <= 10000
-        && d.url is string && d.url.size() <= 2048 && d.archived is bool && d.revision is int && d.updatedBy == request.auth.uid && d.updatedAt == request.time;
+        && d.url is string && d.url.size() <= 2048 && (!('attributes' in d) || (d.attributes is string && d.attributes.size() <= 30000)) && d.archived is bool && d.revision is int && d.updatedBy == request.auth.uid && d.updatedAt == request.time;
     }
     match /events/{event} {
       allow read: if reader(event);

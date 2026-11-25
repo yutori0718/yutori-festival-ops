@@ -7,6 +7,6 @@ describe('バックアップの検証',()=>{
   const rec={id:'r1',kind:'operationalRecords' as const,fields:{category:'recruitment',title:'Plan',status:'未着手',certainty:'未確定',date:'',details:'',url:'',archived:false}};
   const decision={id:'d1',kind:'decisions' as const,fields:{title:'判断',details:'',status:'未確定',resolution:'案',logId:''}};
   expect(valid(decision)).toBe(true);expect(valid({...decision,fields:{...decision.fields,status:'決定済み'}})).toBe(false);
-  expect(valid(task)).toBe(true);expect(valid(stage)).toBe(true);expect(valid(rec)).toBe(true);expect(valid({...task,fields:{...task.fields,progress:100}})).toBe(false);expect(valid({...rec,id:'invalid/path'})).toBe(false);expect(valid({...rec,fields:{...rec.fields,unknown:'secret'}})).toBe(false);
+  expect(valid(task)).toBe(true);expect(valid(stage)).toBe(true);expect(valid(rec)).toBe(true);expect(valid({...rec,fields:{...rec.fields,attributes:'{}'}})).toBe(true);expect(valid({...rec,fields:{...rec.fields,attributes:42}})).toBe(false);expect(valid({...task,fields:{...task.fields,progress:100}})).toBe(false);expect(valid({...rec,id:'invalid/path'})).toBe(false);expect(valid({...rec,fields:{...rec.fields,unknown:'secret'}})).toBe(false);
  });
 });

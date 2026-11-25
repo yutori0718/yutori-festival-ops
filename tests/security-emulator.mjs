@@ -101,3 +101,13 @@ test('追加のタスク詳細とステージ詳細は管理者のみ変更で�
  await assertFails(updateDoc(ref(member,`events/${event}/tasks/metadata`),{metadata:'{"visibility":"参加者向け"}',revision:2,updatedBy:'member',updatedAt:serverTimestamp()}));
  await assertSucceeds(updateDoc(ref(admin,`events/${event}/tasks/metadata`),{metadata:'{"category":"準備"}',revision:2,updatedBy:'admin',updatedAt:serverTimestamp()}));
 });
+
+
+test('カテゴリ別詳細は管理者だけが保存できる',async()=>{
+ const admin=env.authenticatedContext('admin').firestore(),member=env.authenticatedContext('member').firestore();
+ const record={eventId:event,category:'videos',title:'Video',status:'未着手',certainty:'未確定',date:'',details:'',url:'',attributes:'{}',archived:false,revision:1,createdBy:'admin',createdAt:serverTimestamp(),updatedBy:'admin',updatedAt:serverTimestamp()};
+ await assertSucceeds(setDoc(ref(admin,`events/${event}/operationalRecords/with-attributes`),record));
+ await assertFails(updateDoc(ref(member,`events/${event}/operationalRecords/with-attributes`),{attributes:'changed',revision:2,updatedBy:'member',updatedAt:serverTimestamp()}));
+ await assertFails(updateDoc(ref(admin,`events/${event}/operationalRecords/with-attributes`),{attributes:'x'.repeat(30001),revision:2,updatedBy:'admin',updatedAt:serverTimestamp()}));
+ await assertSucceeds(updateDoc(ref(admin,`events/${event}/operationalRecords/with-attributes`),{attributes:'new',revision:2,updatedBy:'admin',updatedAt:serverTimestamp()}));
+});
