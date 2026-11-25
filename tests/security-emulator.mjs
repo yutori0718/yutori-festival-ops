@@ -19,3 +19,14 @@ test('担当者は担当タスクの進捗のみ更新できる',async()=>{const
 test('権限の自己変更と公開データへの直接アクセスは拒否',async()=>{const db=env.authenticatedContext('member').firestore();await assertFails(updateDoc(ref(db,`events/${event}/memberships/member`),{role:'admin'}));await assertFails(setDoc(ref(db,'publicEvents/test'),{title:'x'}));await assertFails(getDoc(ref(env.unauthenticatedContext().firestore(),'publicEvents/test')));});
 test('異なる大会のメンバー権限ではアクセスできない',async()=>{const db=env.authenticatedContext('admin').firestore();await assertFails(getDoc(ref(db,'events/another/tasks/existing')));});
 
+
+test('ステージは大会メンバーのみ閲覧でき、管理者以外の書込みを拒否する',async()=>{
+ const stage={name:'Stage',date:'',confidence:'未確定',details:'',revision:1,eventId:event,createdBy:'admin',createdAt:serverTimestamp(),updatedBy:'admin',updatedAt:serverTimestamp()};
+ const admin=env.authenticatedContext('admin').firestore(); const member=env.authenticatedContext('member').firestore();
+ await assertSucceeds(setDoc(ref(admin,`events/${event}/stages/stage-one`),stage));
+ await assertSucceeds(getDoc(ref(member,`events/${event}/stages/stage-one`)));
+ await assertFails(updateDoc(ref(member,`events/${event}/stages/stage-one`),{name:'modified',revision:2,updatedBy:'member',updatedAt:serverTimestamp()}));
+ await assertFails(getDoc(ref(env.unauthenticatedContext().firestore(),`events/${event}/stages/stage-one`)));
+ await assertFails(updateDoc(ref(admin,`events/${event}/stages/stage-one`),{name:'modified',revision:3,updatedBy:'admin',updatedAt:serverTimestamp()}));
+ await assertSucceeds(updateDoc(ref(admin,`events/${event}/stages/stage-one`),{date:'2027-01-01',revision:2,updatedBy:'admin',updatedAt:serverTimestamp()}));
+});
