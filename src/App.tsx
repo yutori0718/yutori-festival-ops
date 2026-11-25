@@ -11,7 +11,7 @@ import {useEffect,useState,type FormEvent} from 'react';
 import {onAuthStateChanged,signOut,type User} from 'firebase/auth';
 import {collection,doc,onSnapshot,runTransaction,serverTimestamp} from 'firebase/firestore';
 import {NavLink,Route,Routes,Navigate,useLocation} from 'react-router-dom';
-import {auth,db,configured,login} from './firebase';
+import {auth,db,configured,login,emulator,testLogin} from './firebase';
 import {statuses,validProgress,isOverdue,todayTokyo,type Task,type Status} from './model';
 type TaskMeta={category:string;stageIds:string;startDate:string;dateConfidence:string;infoConfidence:string;details:string;checks:string;questions:string;manualWeeklyChange:string;links:string;attachments:string;checklist:string;dependencyIds:string;visibility:string;approval:string};
 const blankMeta:TaskMeta={category:'',stageIds:'',startDate:'',dateConfidence:'未定',infoConfidence:'未確定',details:'',checks:'',questions:'',manualWeeklyChange:'',links:'',attachments:'',checklist:'',dependencyIds:'',visibility:'運営限定',approval:'未承認'};
@@ -33,7 +33,7 @@ function App(){
  if(location.pathname==='/participants')return <Participants/>;
  if(loading)return <main className="center">読み込み中…</main>;
  if(!configured)return <main className="center"><h1>Firebase の設定が必要です</h1><p>.env.local に設定値を登録してください。認証・保存は未接続です。</p></main>;
- if(!user)return <main className="center"><div className="login"><span className="eyebrow">OPERATIONS CONTROL CENTER</span><h1>YUTORI<br/>FESTIVAL<span className="accent">.</span></h1><p>大会運営の進捗を、ひとつの場所に。</p><button onClick={()=>login().catch(()=>setMessage('ログインに失敗しました。'))}>Google でログイン</button><p>{message}</p></div></main>;
+ if(!user)return <main className="center"><div className="login"><span className="eyebrow">OPERATIONS CONTROL CENTER</span><h1>YUTORI<br/>FESTIVAL<span className="accent">.</span></h1><p>大会運営の進捗を、ひとつの場所に。</p><button onClick={()=>login().catch(()=>setMessage('ログインに失敗しました。'))}>Google でログイン</button>{emulator&&<button onClick={()=>testLogin().catch(()=>setMessage('テスト認証に失敗しました。'))}>テスト用ログイン</button>}<p>{message}</p></div></main>;
  if(!eventId||!role)return <main className="center"><div className="login"><h1>大会に接続</h1><p>管理者から共有された大会 ID を入力してください。ログインだけでは権限は付与されません。</p><form onSubmit={e=>{e.preventDefault();localStorage.setItem('ops-event',input.trim());setEventId(input.trim())}}><input aria-label="大会 ID" value={input} onChange={e=>setInput(e.target.value)}/><button>接続</button></form>{eventId&&<p>権限がないか、大会 ID が正しくありません。</p>}<p>{message}</p><button className="secondary" onClick={()=>signOut(auth)}>ログアウト</button></div></main>;
  const cards=[['全タスク',active.length,'全件'],['完了',active.filter(t=>t.status==='完了').length,'完了'],['未着手',active.filter(t=>t.status==='未着手').length,'未着手'],['対応中',active.filter(t=>t.status==='対応中').length,'対応中'],['確認待ち',active.filter(t=>t.status==='確認待ち').length,'確認待ち'],['承認待ち',active.filter(t=>t.status==='承認待ち').length,'承認待ち'],['期限超過',active.filter(t=>isOverdue(t,today)).length,'期限超過']];
  const inDays=(days:number)=>{const d=new Date(`${today}T00:00:00Z`);d.setUTCDate(d.getUTCDate()+days);return d.toISOString().slice(0,10)};

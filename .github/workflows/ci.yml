@@ -23,3 +23,5 @@ jobs:
       - run: npm run build
       - run: npx firebase emulators:exec --only firestore --project demo-yutori-ops "node --test tests/security-emulator.mjs"
 
+      - run: npx playwright install --with-deps chromium
+      - run: npx firebase emulators:exec --only auth,firestore --project demo-yutori-ops "npx playwright test"
