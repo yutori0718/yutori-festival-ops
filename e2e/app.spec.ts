@@ -15,3 +15,11 @@ test('同時編集の競合を検出する',async({browser})=>{
  await first.getByLabel('次のアクション').fill('先の変更');await first.getByRole('button',{name:'保存',exact:true}).click();await expect(first.getByRole('button',{name:/同時編集テスト/})).toContainText('先の変更');
  await second.getByLabel('次のアクション').fill('後の変更');await second.getByRole('button',{name:'保存',exact:true}).click();await expect(second.getByRole('status')).toContainText('別の編集が先に保存されました');await context.close();
 });
+
+test('承認した情報だけを公開し取り消せる',async({browser})=>{
+ const context=await browser.newContext();const page=await context.newPage();await page.goto('/yutori-festival-ops/#/admin');await page.getByRole('button',{name:'テスト用ログイン'}).click();await page.getByLabel('大会 ID').fill('e2e');await page.getByRole('button',{name:'接続'}).click();await page.getByRole('link',{name:'情報公開',exact:true}).click();
+ await page.getByLabel('タイトル').fill('公開検証');await page.getByLabel('内容').fill('参加者向けの検証');await page.getByLabel('確度').selectOption('確定');await page.getByLabel('公開解禁日時（日本時間）').fill('2020-01-01T00:00');await page.getByRole('button',{name:'下書き保存'}).click();await expect(page.getByRole('button',{name:'承認',exact:true})).toBeVisible();
+ const publicContext=await browser.newContext();const participant=await publicContext.newPage();await participant.goto('/yutori-festival-ops/#/participants');await participant.getByLabel('大会 ID').fill('e2e');await participant.getByRole('button',{name:'表示'}).click();await expect(participant.getByText('公開情報はありません。')).toBeVisible();
+ await page.getByRole('button',{name:'承認',exact:true}).click();await expect(page.getByRole('button',{name:'公開',exact:true})).toBeVisible();await page.getByRole('button',{name:'公開',exact:true}).click();await expect(participant.getByRole('heading',{name:'公開検証'})).toBeVisible();
+ page.once('dialog',dialog=>dialog.accept());await page.getByRole('button',{name:'公開取消'}).click();await expect(participant.getByRole('heading',{name:'公開検証'})).toHaveCount(0);await publicContext.close();await context.close();
+});
