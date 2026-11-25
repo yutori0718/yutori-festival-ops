@@ -33,6 +33,16 @@ service cloud.firestore {
         allow get: if signed() && request.auth.uid == uid;
         allow list, write: if false;
       }
+      match /weeklySnapshots/{snapshot} {
+        allow read: if reader(event);
+        allow create: if admin(event) && request.resource.data.keys().hasOnly(['eventId','label','data','comment','createdBy','createdAt'])
+          && request.resource.data.keys().hasAll(['eventId','label','data','comment','createdBy','createdAt'])
+          && request.resource.data.eventId == event && request.resource.data.label is string && request.resource.data.label.size() > 0 && request.resource.data.label.size() <= 100
+          && request.resource.data.data is string && request.resource.data.data.size() <= 700000
+          && request.resource.data.comment is string && request.resource.data.comment.size() <= 4000
+          && request.resource.data.createdBy == request.auth.uid && request.resource.data.createdAt == request.time;
+        allow update, delete: if false;
+      }
       match /stages/{stage} {
         allow read: if reader(event);
         allow create, update: if admin(event) && validStage(event)
