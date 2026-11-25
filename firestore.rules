@@ -41,6 +41,15 @@ service cloud.firestore {
         && d.certainty in ['確定','予定','未確定'] && d.releaseAt is timestamp && d.status in ['下書き','承認済み','公開済み']
         && d.revision is int && d.updatedBy == request.auth.uid && d.updatedAt == request.time;
     }
+    function validRecord(event) {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['eventId','category','title','status','certainty','date','details','url','archived','revision','createdBy','createdAt','updatedBy','updatedAt'])
+        && d.keys().hasAll(['eventId','category','title','status','certainty','date','details','url','archived','revision','createdBy','createdAt','updatedBy','updatedAt'])
+        && d.eventId == event && d.category in ['schedule','recruitment','selections','invitations','videos','prizes','rules']
+        && d.title is string && d.title.size() > 0 && d.title.size() <= 200 && d.status in ['未着手','対応中','確認待ち','承認待ち','完了','保留']
+        && d.certainty in ['未確定','予定','確定'] && d.date is string && d.date.size() <= 10 && d.details is string && d.details.size() <= 10000
+        && d.url is string && d.url.size() <= 2048 && d.archived is bool && d.revision is int && d.updatedBy == request.auth.uid && d.updatedAt == request.time;
+    }
     match /events/{event} {
       allow read: if reader(event);
       allow write: if false;
@@ -51,6 +60,12 @@ service cloud.firestore {
           && request.resource.data.keys().hasOnly(['role','updatedBy','updatedAt']) && request.resource.data.keys().hasAll(['role','updatedBy','updatedAt'])
           && request.resource.data.role in ['admin','member','viewer'] && request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt == request.time;
         allow delete: if admin(event) && uid != request.auth.uid;
+      }
+      match /operationalRecords/{record} {
+        allow read: if reader(event);
+        allow create: if admin(event) && validRecord(event) && request.resource.data.revision == 1 && request.resource.data.createdBy == request.auth.uid && request.resource.data.createdAt == request.time;
+        allow update: if admin(event) && validRecord(event) && request.resource.data.revision == resource.data.revision + 1 && request.resource.data.category == resource.data.category && request.resource.data.createdBy == resource.data.createdBy && request.resource.data.createdAt == resource.data.createdAt;
+        allow delete: if false;
       }
       match /publications/{publication} {
         allow read: if reader(event);

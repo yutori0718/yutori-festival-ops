@@ -84,3 +84,13 @@ test('管理者は他者の権限を管理できるが自己変更は拒否さ�
  await assertFails(setDoc(ref(admin,`events/${event}/memberships/admin`),{role:'viewer',updatedBy:'admin',updatedAt:serverTimestamp()}));
  await assertFails(setDoc(ref(member,`events/${event}/memberships/newuser`),{role:'admin',updatedBy:'member',updatedAt:serverTimestamp()}));
 });
+
+
+test('大会準備データは会員だけが読み、管理者だけが変更する',async()=>{
+ const admin=env.authenticatedContext('admin').firestore(), member=env.authenticatedContext('member').firestore();
+ const record={eventId:event,category:'recruitment',title:'Plan',status:'未着手',certainty:'未確定',date:'',details:'',url:'',archived:false,revision:1,createdBy:'admin',createdAt:serverTimestamp(),updatedBy:'admin',updatedAt:serverTimestamp()};
+ await assertSucceeds(setDoc(ref(admin,`events/${event}/operationalRecords/r1`),record));
+ await assertSucceeds(getDoc(ref(member,`events/${event}/operationalRecords/r1`)));
+ await assertFails(updateDoc(ref(member,`events/${event}/operationalRecords/r1`),{title:'bad',revision:2,updatedBy:'member',updatedAt:serverTimestamp()}));
+ await assertFails(getDoc(ref(env.unauthenticatedContext().firestore(),`events/${event}/operationalRecords/r1`)));
+});
