@@ -30,3 +30,12 @@ test('ステージは大会メンバーのみ閲覧でき、管理者以外の�
  await assertFails(updateDoc(ref(admin,`events/${event}/stages/stage-one`),{name:'modified',revision:3,updatedBy:'admin',updatedAt:serverTimestamp()}));
  await assertSucceeds(updateDoc(ref(admin,`events/${event}/stages/stage-one`),{date:'2027-01-01',revision:2,updatedBy:'admin',updatedAt:serverTimestamp()}));
 });
+
+test('週次スナップショットは管理者のみ作成でき、保存後は変更できない',async()=>{
+ const admin=env.authenticatedContext('admin').firestore(), member=env.authenticatedContext('member').firestore();
+ const record={eventId:event,label:'week',data:'[]',comment:'',createdBy:'admin',createdAt:serverTimestamp()};
+ await assertSucceeds(setDoc(ref(admin,`events/${event}/weeklySnapshots/w1`),record));
+ await assertSucceeds(getDoc(ref(member,`events/${event}/weeklySnapshots/w1`)));
+ await assertFails(setDoc(ref(member,`events/${event}/weeklySnapshots/w2`),{...record,createdBy:'member'}));
+ await assertFails(updateDoc(ref(admin,`events/${event}/weeklySnapshots/w1`),{comment:'changed'}));
+});
