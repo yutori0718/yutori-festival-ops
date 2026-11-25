@@ -1,7 +1,7 @@
 import {readFileSync} from 'node:fs';
 import {before, after, test} from 'node:test';
 import {initializeTestEnvironment, assertFails, assertSucceeds} from '@firebase/rules-unit-testing';
-import {doc, getDoc, setDoc, updateDoc, serverTimestamp} from 'firebase/firestore';
+import {doc, getDoc, setDoc, updateDoc, writeBatch, serverTimestamp} from 'firebase/firestore';
 let env;
 const event='event-one';
 const task=(who='admin')=>({title:'Task',status:'未着手',progress:0,dueDate:'',priority:'中',nextAction:'',assigneeIds:['member'],archived:false,revision:1,eventId:event,createdBy:who,createdAt:serverTimestamp(),updatedBy:who,updatedAt:serverTimestamp()});
@@ -38,4 +38,16 @@ test('週次スナップショットは管理者のみ作成でき、保存後�
  await assertSucceeds(getDoc(ref(member,`events/${event}/weeklySnapshots/w1`)));
  await assertFails(setDoc(ref(member,`events/${event}/weeklySnapshots/w2`),{...record,createdBy:'member'}));
  await assertFails(updateDoc(ref(admin,`events/${event}/weeklySnapshots/w1`),{comment:'changed'}));
+});
+
+
+test('決定には同時に変更不可能な決定ログが必要',async()=>{
+ const admin=env.authenticatedContext('admin').firestore(), member=env.authenticatedContext('member').firestore();
+ const decision=ref(admin,`events/${event}/decisions/d1`), log=ref(admin,`events/${event}/decisionLogs/l1`);
+ await assertSucceeds(setDoc(decision,{eventId:event,title:'Question',details:'',status:'未確定',resolution:'',logId:'',revision:1,createdBy:'admin',createdAt:serverTimestamp(),updatedBy:'admin',updatedAt:serverTimestamp()}));
+ await assertFails(updateDoc(decision,{status:'決定済み',resolution:'answer',logId:'missing',revision:2,updatedBy:'admin',updatedAt:serverTimestamp()}));
+ await assertFails(updateDoc(ref(member,`events/${event}/decisions/d1`),{title:'bad',revision:2,updatedBy:'member',updatedAt:serverTimestamp()}));
+ const batch=writeBatch(admin);batch.update(decision,{status:'決定済み',resolution:'answer',logId:'l1',revision:2,updatedBy:'admin',updatedAt:serverTimestamp()});batch.set(log,{eventId:event,decisionId:'d1',title:'Question',resolution:'answer',decidedBy:'admin',decidedAt:serverTimestamp()});await assertSucceeds(batch.commit());
+ await assertFails(updateDoc(log,{resolution:'altered'}));
+ await assertFails(updateDoc(decision,{resolution:'altered',revision:3,updatedBy:'admin',updatedAt:serverTimestamp()}));
 });
