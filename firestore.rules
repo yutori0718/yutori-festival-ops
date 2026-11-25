@@ -26,12 +26,37 @@ service cloud.firestore {
         && d.details is string && d.details.size() <= 4000 && d.revision is int
         && d.updatedBy == request.auth.uid && d.updatedAt == request.time;
     }
+    function validDecision(event) {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['title','details','status','resolution','revision','logId','eventId','createdBy','createdAt','updatedBy','updatedAt']) && d.keys().hasAll(['title','details','status','resolution','revision','logId','eventId','createdBy','createdAt','updatedBy','updatedAt'])
+      && d.eventId == event && d.title is string && d.title.size() > 0 && d.title.size() <= 200 && d.details is string && d.details.size() <= 4000
+      && d.status in ['未確定','決定済み'] && d.resolution is string && d.resolution.size() <= 4000 && d.logId is string && d.revision is int && d.updatedBy == request.auth.uid && d.updatedAt == request.time;
+    }
     match /events/{event} {
       allow read: if reader(event);
       allow write: if false;
       match /memberships/{uid} {
         allow get: if signed() && request.auth.uid == uid;
         allow list, write: if false;
+      }
+      match /decisions/{decision} {
+        allow read: if reader(event);
+        allow create: if admin(event) && validDecision(event) && request.resource.data.revision == 1 && request.resource.data.status == '未確定' && request.resource.data.logId == '' && request.resource.data.createdBy == request.auth.uid && request.resource.data.createdAt == request.time;
+        allow update: if admin(event) && validDecision(event) && request.resource.data.revision == resource.data.revision + 1 && request.resource.data.createdBy == resource.data.createdBy && request.resource.data.createdAt == resource.data.createdAt
+          && ((resource.data.status == '未確定' && request.resource.data.status == '未確定' && request.resource.data.logId == '')
+          || (resource.data.status == '未確定' && request.resource.data.status == '決定済み' && request.resource.data.resolution.size() > 0 && request.resource.data.logId.size() > 0 && getAfter(/databases/$(database)/documents/events/$(event)/decisionLogs/$(request.resource.data.logId)).data.decisionId == decision && getAfter(/databases/$(database)/documents/events/$(event)/decisionLogs/$(request.resource.data.logId)).data.resolution == request.resource.data.resolution)
+          || (resource.data.status == '決定済み' && request.resource.data.status == '決定済み' && request.resource.data.resolution == resource.data.resolution && request.resource.data.logId == resource.data.logId));
+        allow delete: if false;
+      }
+      match /decisionLogs/{log} {
+        allow read: if reader(event);
+        allow create: if admin(event) && request.resource.data.keys().hasOnly(['eventId','decisionId','title','resolution','decidedBy','decidedAt']) && request.resource.data.keys().hasAll(['eventId','decisionId','title','resolution','decidedBy','decidedAt'])
+          && request.resource.data.eventId == event && request.resource.data.decisionId is string && request.resource.data.title is string && request.resource.data.resolution is string && request.resource.data.decidedBy == request.auth.uid && request.resource.data.decidedAt == request.time
+          && get(/databases/$(database)/documents/events/$(event)/decisions/$(request.resource.data.decisionId)).data.status == '未確定'
+          && getAfter(/databases/$(database)/documents/events/$(event)/decisions/$(request.resource.data.decisionId)).data.logId == log
+          && getAfter(/databases/$(database)/documents/events/$(event)/decisions/$(request.resource.data.decisionId)).data.status == '決定済み'
+          && getAfter(/databases/$(database)/documents/events/$(event)/decisions/$(request.resource.data.decisionId)).data.resolution == request.resource.data.resolution;
+        allow update, delete: if false;
       }
       match /weeklySnapshots/{snapshot} {
         allow read: if reader(event);
