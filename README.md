@@ -1,12 +1,14 @@
 # YUTORI FESTIVAL - OPERATIONS CONTROL CENTER
 
-大会運営のタスク、ステージ、判断事項、公開情報と週次レビューを管理する開発中のアプリです。GitHub Pages での本番公開はまだ行っていません。
+大会運営のタスク、ステージ、判断事項、公開情報と週次レビューを管理するアプリです。
+
+[運営画面](https://yutori0718.github.io/yutori-festival-ops/#/admin) ・ [参加者向け画面](https://yutori0718.github.io/yutori-festival-ops/#/participants) ・ [運用ガイド](docs/USER_GUIDE.md)
 
 ## 開発状況
 
 - Google 認証、Firestore の大会別アクセス制御、タスクの共同編集、公開情報の承認・公開・取消を実装しています。
 - ステージ管理、週次レビュー、準備項目、メンバー管理、JSON バックアップを実装しています。バックアップはタスク、ステージ、準備項目、未確定事項が対象です。決定済み事項、公開情報、メンバー、各種履歴、週次データは対象外です。
-- Firestore Emulator で権限と公開制御、Playwright で保存・再読込を検証しています。本番 Firebase での共同編集と権限の最終確認、全機能の完成は未了です。
+- Firestore Emulator で権限と公開制御、Playwright で保存・再読込を検証しています。本番 Firebase でも未ログインで内部情報の取得が拒否されることを確認しています。
 - 大会の内部情報、初期データ、バックアップ、個人情報を公開リポジトリへコミットしないでください。
 
 ## ローカル開発
