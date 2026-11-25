@@ -5,3 +5,4 @@
 .stage-field{display:grid;grid-template-columns:2fr 1fr;gap:8px;margin:12px 0}.stage-field label{display:grid;gap:4px}details label{margin:8px 0}
 
 .toolbar{flex-wrap:wrap}.toolbar input{max-width:230px}
+.calendar{display:grid;grid-template-columns:repeat(7,minmax(100px,1fr));overflow:auto}.calendar-day{min-height:110px;border:1px solid #30465b;padding:8px}.calendar-day button{display:block;width:100%;padding:5px;margin:4px 0;text-align:left;font-size:14px}.gantt-row{display:grid;grid-template-columns:minmax(120px,1fr) 3fr 100px;gap:10px;align-items:center;margin:10px 0}.gantt-track{background:#0c1829;height:20px;border-radius:4px}.gantt-bar{height:100%;background:#24dfef;border-radius:4px;min-width:3px}
