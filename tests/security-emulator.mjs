@@ -76,3 +76,11 @@ test('未確定情報と未来の解禁前情報は公開できない',async()=>
   await assertSucceeds(updateDoc(pub,{status:'承認済み',revision:2,updatedBy:'admin',updatedAt:serverTimestamp()}));const batch=writeBatch(admin);batch.update(pub,{status:'公開済み',revision:3,updatedBy:'admin',updatedAt:serverTimestamp()});batch.set(out,{eventId:event,title:'Title',body:'Body',category:'お知らせ',publishedAt:serverTimestamp()});await assertFails(batch.commit());
  }
 });
+
+
+test('管理者は他者の権限を管理できるが自己変更は拒否される',async()=>{
+ const admin=env.authenticatedContext('admin').firestore(), member=env.authenticatedContext('member').firestore();
+ await assertSucceeds(setDoc(ref(admin,`events/${event}/memberships/newuser`),{role:'viewer',updatedBy:'admin',updatedAt:serverTimestamp()}));
+ await assertFails(setDoc(ref(admin,`events/${event}/memberships/admin`),{role:'viewer',updatedBy:'admin',updatedAt:serverTimestamp()}));
+ await assertFails(setDoc(ref(member,`events/${event}/memberships/newuser`),{role:'admin',updatedBy:'member',updatedAt:serverTimestamp()}));
+});

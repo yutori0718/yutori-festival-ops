@@ -46,7 +46,11 @@ service cloud.firestore {
       allow write: if false;
       match /memberships/{uid} {
         allow get: if signed() && request.auth.uid == uid;
-        allow list, write: if false;
+        allow list: if admin(event);
+        allow create, update: if admin(event) && uid != request.auth.uid
+          && request.resource.data.keys().hasOnly(['role','updatedBy','updatedAt']) && request.resource.data.keys().hasAll(['role','updatedBy','updatedAt'])
+          && request.resource.data.role in ['admin','member','viewer'] && request.resource.data.updatedBy == request.auth.uid && request.resource.data.updatedAt == request.time;
+        allow delete: if admin(event) && uid != request.auth.uid;
       }
       match /publications/{publication} {
         allow read: if reader(event);
