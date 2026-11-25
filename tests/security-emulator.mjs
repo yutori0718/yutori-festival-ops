@@ -119,3 +119,28 @@ test('カテゴリ別詳細は管理者だけが保存できる',async()=>{
  await assertFails(updateDoc(ref(admin,`events/${event}/operationalRecords/with-attributes`),{attributes:'x'.repeat(30001),revision:2,updatedBy:'admin',updatedAt:serverTimestamp()}));
  await assertSucceeds(updateDoc(ref(admin,`events/${event}/operationalRecords/with-attributes`),{attributes:'new',revision:2,updatedBy:'admin',updatedAt:serverTimestamp()}));
 });
+
+
+test('バックアップ履歴は管理者だけが閲覧・追加できる',async()=>{
+ const admin=env.authenticatedContext('admin').firestore(), member=env.authenticatedContext('member').firestore();
+ const log=`events/${event}/backupHistory/b1`;
+ const data={action:'export',count:2,skipped:0,actor:'admin',at:serverTimestamp()};
+ await assertSucceeds(setDoc(ref(admin,log),data));
+ await assertSucceeds(getDoc(ref(admin,log)));
+ await assertFails(getDoc(ref(member,log)));
+ await assertFails(setDoc(ref(member,`events/${event}/backupHistory/b2`),{...data,actor:'member'}));
+ await assertFails(updateDoc(ref(admin,log),{count:1}));
+});
+
+
+test('担当者の確認事項とコメントは内部だけに保存する',async()=>{
+ const member=env.authenticatedContext('member').firestore(),viewer=env.authenticatedContext('viewer').firestore(),anonymous=env.unauthenticatedContext().firestore();
+ const comments=`events/${event}/tasks/existing/comments`;
+ const data={text:'Check this',kind:'確認事項',actor:'member',at:serverTimestamp()};
+ await assertSucceeds(setDoc(ref(member,`${comments}/one`),data));
+ await assertSucceeds(getDoc(ref(viewer,`${comments}/one`)));
+ await assertFails(getDoc(ref(anonymous,`${comments}/one`)));
+ await assertFails(setDoc(ref(viewer,`${comments}/two`),{...data,actor:'viewer'}));
+ await assertFails(setDoc(ref(member,`${comments}/three`),{...data,actor:'admin'}));
+ await assertFails(updateDoc(ref(member,`${comments}/one`),{text:'new text'}));
+});

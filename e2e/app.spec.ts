@@ -23,3 +23,28 @@ test('承認した情報だけを公開し取り消せる',async({browser})=>{
  await page.getByRole('button',{name:'承認',exact:true}).click();await expect(page.getByRole('button',{name:'公開',exact:true})).toBeVisible();await page.getByRole('button',{name:'公開',exact:true}).click();await expect(participant.getByRole('heading',{name:'公開検証'})).toBeVisible();
  page.once('dialog',dialog=>dialog.accept());await page.getByRole('button',{name:'公開取消'}).click();await expect(participant.getByRole('heading',{name:'公開検証'})).toHaveCount(0);await publicContext.close();await context.close();
 });
+
+
+test('バックアップを復元して再実行しても重複を作らない',async({page})=>{
+ await page.goto('/yutori-festival-ops/#/admin');
+ await page.getByRole('button',{name:'テスト用ログイン'}).click();
+ await page.getByLabel('大会 ID').fill('e2e');
+ await page.getByRole('button',{name:'接続'}).click();
+ await page.getByRole('link',{name:'バックアップ',exact:true}).click();
+ const record={id:'backup-stage',kind:'stages',fields:{name:'復元ステージ',date:'',confidence:'未確定',details:'',attributes:'{}',checklist:'{}'}};
+ const file={name:'backup.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify({eventId:'e2e',version:1,exportedAt:'2026-01-01T00:00:00Z',records:[record]}))};
+ await page.getByLabel('バックアップファイル').setInputFiles(file);
+ await expect(page.getByText(/既存 ID 0 件/)).toBeVisible();
+ page.once('dialog',dialog=>dialog.accept());
+ await page.getByRole('button',{name:'確認して復元'}).click();
+ await expect(page.getByRole('status')).toContainText('復元 1件');
+ await expect(page.getByText('JSON 復元',{exact:true}).last()).toBeVisible();
+ await page.getByLabel('バックアップファイル').setInputFiles(file);
+ await expect(page.getByText(/既存 ID 1 件/)).toBeVisible();
+ page.once('dialog',dialog=>dialog.accept());
+ await page.getByRole('button',{name:'確認して復元'}).click();
+ await expect(page.getByRole('status')).toContainText('復元 0件、既存のためスキップ 1件');
+ const download=page.waitForEvent('download');
+ await page.getByRole('button',{name:'JSON を出力'}).click();
+ expect((await download).suggestedFilename()).toBe('operations-backup.json');
+});

@@ -127,6 +127,17 @@ service cloud.firestore {
           && getAfter(/databases/$(database)/documents/events/$(event)/decisions/$(request.resource.data.decisionId)).data.resolution == request.resource.data.resolution;
         allow update, delete: if false;
       }
+      match /backupHistory/{entry} {
+        allow read: if admin(event);
+        allow create: if admin(event)
+          && request.resource.data.keys().hasOnly(['action','count','skipped','actor','at'])
+          && request.resource.data.keys().hasAll(['action','count','skipped','actor','at'])
+          && request.resource.data.action in ['export','restore']
+          && request.resource.data.count is int && request.resource.data.count >= 0
+          && request.resource.data.skipped is int && request.resource.data.skipped >= 0
+          && request.resource.data.actor == request.auth.uid && request.resource.data.at == request.time;
+        allow update, delete: if false;
+      }
       match /weeklySnapshots/{snapshot} {
         allow read: if reader(event);
         allow create: if admin(event) && request.resource.data.keys().hasOnly(['eventId','label','data','comment','createdBy','createdAt'])
@@ -152,6 +163,19 @@ service cloud.firestore {
           && (admin(event) || (member(event) && role(event) == 'member' && request.auth.uid in resource.data.assigneeIds
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','progress','nextAction','revision','updatedBy','updatedAt'])));
         allow delete: if false;
+        match /comments/{comment} {
+          allow read: if reader(event);
+          allow create: if reader(event) && role(event) in ['admin','member']
+            && exists(/databases/$(database)/documents/events/$(event)/tasks/$(task))
+            && request.resource.data.keys().hasOnly(['text','kind','actor','at'])
+            && request.resource.data.keys().hasAll(['text','kind','actor','at'])
+            && request.resource.data.text is string && request.resource.data.text.size() > 0
+            && request.resource.data.text.size() <= 2000
+            && request.resource.data.kind in ['コメント','確認事項','公開承認申請']
+            && request.resource.data.actor == request.auth.uid && request.resource.data.at == request.time;
+          allow update, delete: if false;
+        }
+
       }
     }
     match /publicEvents/{event}/announcements/{publication} {
