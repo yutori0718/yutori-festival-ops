@@ -53,6 +53,12 @@ test('決定には同時に変更不可能な決定ログが必要',async()=>{
 });
 
 
+function publicationTransition(db, pub, {status,action,revision, title='Title'}) {
+ const batch=writeBatch(db), log=doc(db,`events/${event}/publicationLogs/${pub.id}-${revision}`);
+ batch.update(pub,{status,revision,logId:log.id,updatedBy:'admin',updatedAt:serverTimestamp()});
+ batch.set(log,{publicationId:pub.id,revision,action,title,actor:'admin',at:serverTimestamp()});
+ return {batch,log};
+}
 test('公開は管理者による確定・承認・解禁後の原子的操作のみ',async()=>{
  const admin=env.authenticatedContext('admin').firestore(), member=env.authenticatedContext('member').firestore();
  const pub=ref(admin,`events/${event}/publications/p1`),out=ref(admin,`publicEvents/${event}/announcements/p1`);
@@ -60,20 +66,22 @@ test('公開は管理者による確定・承認・解禁後の原子的操作�
  await assertSucceeds(setDoc(pub,rec));
  await assertFails(setDoc(out,{eventId:event,title:'Title',body:'Body',category:'お知らせ',publishedAt:serverTimestamp()}));
  await assertFails(updateDoc(ref(member,`events/${event}/publications/p1`),{status:'承認済み',revision:2,updatedBy:'member',updatedAt:serverTimestamp()}));
- await assertSucceeds(updateDoc(pub,{status:'承認済み',revision:2,updatedBy:'admin',updatedAt:serverTimestamp()}));
- const bad=writeBatch(admin);bad.update(pub,{status:'公開済み',revision:3,updatedBy:'admin',updatedAt:serverTimestamp()});bad.set(out,{eventId:event,title:'Title',body:'secret',category:'お知らせ',publishedAt:serverTimestamp()});await assertFails(bad.commit());
- const good=writeBatch(admin);good.update(pub,{status:'公開済み',revision:3,updatedBy:'admin',updatedAt:serverTimestamp()});good.set(out,{eventId:event,title:'Title',body:'Body',category:'お知らせ',publishedAt:serverTimestamp()});await assertSucceeds(good.commit());
+ await assertFails(updateDoc(pub,{status:'承認済み',revision:2,updatedBy:'admin',updatedAt:serverTimestamp()}));
+ await assertSucceeds(publicationTransition(admin,pub,{status:'承認済み',action:'承認',revision:2}).batch.commit());
+ const {batch:bad}=publicationTransition(admin,pub,{status:'公開済み',action:'公開',revision:3});bad.set(out,{eventId:event,title:'Title',body:'secret',category:'お知らせ',publishedAt:serverTimestamp()});await assertFails(bad.commit());
+ const {batch:good,log}=publicationTransition(admin,pub,{status:'公開済み',action:'公開',revision:3});good.set(out,{eventId:event,title:'Title',body:'Body',category:'お知らせ',publishedAt:serverTimestamp()});await assertSucceeds(good.commit());
  await assertSucceeds(getDoc(ref(env.unauthenticatedContext().firestore(),`publicEvents/${event}/announcements/p1`)));
  await assertFails(updateDoc(pub,{body:'Changed',revision:4,updatedBy:'admin',updatedAt:serverTimestamp()}));
- const unpublish=writeBatch(admin);unpublish.update(pub,{status:'下書き',revision:4,updatedBy:'admin',updatedAt:serverTimestamp()});unpublish.delete(out);await assertSucceeds(unpublish.commit());
+ await assertSucceeds(getDoc(log));await assertFails(updateDoc(log,{action:'取消'}));await assertFails(getDoc(ref(env.unauthenticatedContext().firestore(),log.path)));
+ const {batch:unpublish}=publicationTransition(admin,pub,{status:'下書き',action:'取消',revision:4});unpublish.delete(out);await assertSucceeds(unpublish.commit());
 });
 test('未確定情報と未来の解禁前情報は公開できない',async()=>{
  const admin=env.authenticatedContext('admin').firestore();
  for(const [id,certainty,releaseAt] of [['unconfirmed','未確定',Timestamp.fromMillis(0)],['future','確定',Timestamp.fromMillis(Date.now()+86400000)]]){
   const pub=ref(admin,`events/${event}/publications/${id}`),out=ref(admin,`publicEvents/${event}/announcements/${id}`);
   await assertSucceeds(setDoc(pub,{eventId:event,title:'Title',body:'Body',category:'お知らせ',certainty,releaseAt,status:'下書き',revision:1,createdBy:'admin',createdAt:serverTimestamp(),updatedBy:'admin',updatedAt:serverTimestamp()}));
-  if(certainty==='未確定'){await assertFails(updateDoc(pub,{status:'承認済み',revision:2,updatedBy:'admin',updatedAt:serverTimestamp()}));continue}
-  await assertSucceeds(updateDoc(pub,{status:'承認済み',revision:2,updatedBy:'admin',updatedAt:serverTimestamp()}));const batch=writeBatch(admin);batch.update(pub,{status:'公開済み',revision:3,updatedBy:'admin',updatedAt:serverTimestamp()});batch.set(out,{eventId:event,title:'Title',body:'Body',category:'お知らせ',publishedAt:serverTimestamp()});await assertFails(batch.commit());
+  if(certainty==='未確定'){await assertFails(publicationTransition(admin,pub,{status:'承認済み',action:'承認',revision:2}).batch.commit());continue}
+  await assertSucceeds(publicationTransition(admin,pub,{status:'承認済み',action:'承認',revision:2}).batch.commit());const {batch}=publicationTransition(admin,pub,{status:'公開済み',action:'公開',revision:3});batch.set(out,{eventId:event,title:'Title',body:'Body',category:'お知らせ',publishedAt:serverTimestamp()});await assertFails(batch.commit());
  }
 });
 

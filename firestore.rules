@@ -34,12 +34,31 @@ service cloud.firestore {
     }
     function validPublication(event) {
       let d = request.resource.data;
-      return d.keys().hasOnly(['eventId','title','body','category','certainty','releaseAt','status','revision','createdBy','createdAt','updatedBy','updatedAt'])
+      return d.keys().hasOnly(['eventId','title','body','category','certainty','releaseAt','status','revision','logId','createdBy','createdAt','updatedBy','updatedAt'])
         && d.keys().hasAll(['eventId','title','body','category','certainty','releaseAt','status','revision','createdBy','createdAt','updatedBy','updatedAt'])
         && d.eventId == event && d.title is string && d.title.size() > 0 && d.title.size() <= 200
         && d.body is string && d.body.size() <= 10000 && d.category in ['お知らせ','大会日程','大会ルール','募集案内','賞品']
         && d.certainty in ['確定','予定','未確定'] && d.releaseAt is timestamp && d.status in ['下書き','承認済み','公開済み']
-        && d.revision is int && d.updatedBy == request.auth.uid && d.updatedAt == request.time;
+        && (!('logId' in d) || (d.logId is string && d.logId.size() <= 100)) && d.revision is int && d.updatedBy == request.auth.uid && d.updatedAt == request.time;
+    }
+    function hasPublicationLog(event, publication, action) {
+      let d = request.resource.data;
+      let path = /databases/$(database)/documents/events/$(event)/publicationLogs/$(d.logId);
+      return d.logId.size() > 0 && !exists(path)
+        && getAfter(path).data.publicationId == publication
+        && getAfter(path).data.action == action
+        && getAfter(path).data.revision == d.revision;
+    }
+    function publicationLogMatches(event, log) {
+      let d = request.resource.data;
+      let path = /databases/$(database)/documents/events/$(event)/publications/$(d.publicationId);
+      let before = get(path).data;
+      let after = getAfter(path).data;
+      return after.logId == log && after.revision == d.revision && after.revision == before.revision + 1
+        && after.title == d.title
+        && ((d.action == '承認' && before.status == '下書き' && after.status == '承認済み')
+          || (d.action == '公開' && before.status == '承認済み' && after.status == '公開済み')
+          || (d.action == '取消' && before.status == '公開済み' && after.status == '下書き'));
     }
     function validRecord(event) {
       let d = request.resource.data;
@@ -69,13 +88,25 @@ service cloud.firestore {
       }
       match /publications/{publication} {
         allow read: if reader(event);
-        allow create: if admin(event) && validPublication(event) && request.resource.data.status == '下書き' && request.resource.data.revision == 1 && request.resource.data.createdBy == request.auth.uid && request.resource.data.createdAt == request.time;
+        allow create: if admin(event) && validPublication(event) && request.resource.data.status == '下書き' && !('logId' in request.resource.data) && request.resource.data.revision == 1 && request.resource.data.createdBy == request.auth.uid && request.resource.data.createdAt == request.time;
         allow update: if admin(event) && validPublication(event) && request.resource.data.revision == resource.data.revision + 1 && request.resource.data.createdBy == resource.data.createdBy && request.resource.data.createdAt == resource.data.createdAt
-          && ((resource.data.status in ['下書き','承認済み'] && request.resource.data.status == '下書き')
-          || (resource.data.status == '下書き' && request.resource.data.status == '承認済み' && resource.data.certainty == '確定' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','revision','updatedBy','updatedAt']))
-          || (resource.data.status == '承認済み' && request.resource.data.status == '公開済み' && resource.data.certainty == '確定' && resource.data.releaseAt <= request.time && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','revision','updatedBy','updatedAt']) && !exists(/databases/$(database)/documents/publicEvents/$(event)/announcements/$(publication)) && existsAfter(/databases/$(database)/documents/publicEvents/$(event)/announcements/$(publication)))
-          || (resource.data.status == '公開済み' && request.resource.data.status == '下書き' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','revision','updatedBy','updatedAt']) && !existsAfter(/databases/$(database)/documents/publicEvents/$(event)/announcements/$(publication))));
+          && ((resource.data.status in ['下書き','承認済み'] && request.resource.data.status == '下書き' && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['logId']))
+          || (resource.data.status == '下書き' && request.resource.data.status == '承認済み' && resource.data.certainty == '確定' && hasPublicationLog(event, publication, '承認') && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','revision','logId','updatedBy','updatedAt']))
+          || (resource.data.status == '承認済み' && request.resource.data.status == '公開済み' && resource.data.certainty == '確定' && resource.data.releaseAt <= request.time && hasPublicationLog(event, publication, '公開') && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','revision','logId','updatedBy','updatedAt']) && !exists(/databases/$(database)/documents/publicEvents/$(event)/announcements/$(publication)) && existsAfter(/databases/$(database)/documents/publicEvents/$(event)/announcements/$(publication)))
+          || (resource.data.status == '公開済み' && request.resource.data.status == '下書き' && hasPublicationLog(event, publication, '取消') && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','revision','logId','updatedBy','updatedAt']) && !existsAfter(/databases/$(database)/documents/publicEvents/$(event)/announcements/$(publication))));
         allow delete: if false;
+      }
+      match /publicationLogs/{log} {
+        allow read: if reader(event);
+        allow create: if admin(event)
+          && request.resource.data.keys().hasOnly(['publicationId','revision','action','title','actor','at'])
+          && request.resource.data.keys().hasAll(['publicationId','revision','action','title','actor','at'])
+          && request.resource.data.publicationId is string
+          && request.resource.data.revision is int
+          && request.resource.data.action in ['承認','公開','取消']
+          && request.resource.data.actor == request.auth.uid && request.resource.data.at == request.time
+          && publicationLogMatches(event, log);
+        allow update, delete: if false;
       }
       match /decisions/{decision} {
         allow read: if reader(event);
