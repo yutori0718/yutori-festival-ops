@@ -32,12 +32,31 @@ service cloud.firestore {
       && d.eventId == event && d.title is string && d.title.size() > 0 && d.title.size() <= 200 && d.details is string && d.details.size() <= 4000
       && d.status in ['未確定','決定済み'] && d.resolution is string && d.resolution.size() <= 4000 && d.logId is string && d.revision is int && d.updatedBy == request.auth.uid && d.updatedAt == request.time;
     }
+    function validPublication(event) {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['eventId','title','body','category','certainty','releaseAt','status','revision','createdBy','createdAt','updatedBy','updatedAt'])
+        && d.keys().hasAll(['eventId','title','body','category','certainty','releaseAt','status','revision','createdBy','createdAt','updatedBy','updatedAt'])
+        && d.eventId == event && d.title is string && d.title.size() > 0 && d.title.size() <= 200
+        && d.body is string && d.body.size() <= 10000 && d.category in ['お知らせ','大会日程','大会ルール','募集案内','賞品']
+        && d.certainty in ['確定','予定','未確定'] && d.releaseAt is timestamp && d.status in ['下書き','承認済み','公開済み']
+        && d.revision is int && d.updatedBy == request.auth.uid && d.updatedAt == request.time;
+    }
     match /events/{event} {
       allow read: if reader(event);
       allow write: if false;
       match /memberships/{uid} {
         allow get: if signed() && request.auth.uid == uid;
         allow list, write: if false;
+      }
+      match /publications/{publication} {
+        allow read: if reader(event);
+        allow create: if admin(event) && validPublication(event) && request.resource.data.status == '下書き' && request.resource.data.revision == 1 && request.resource.data.createdBy == request.auth.uid && request.resource.data.createdAt == request.time;
+        allow update: if admin(event) && validPublication(event) && request.resource.data.revision == resource.data.revision + 1 && request.resource.data.createdBy == resource.data.createdBy && request.resource.data.createdAt == resource.data.createdAt
+          && ((resource.data.status in ['下書き','承認済み'] && request.resource.data.status == '下書き')
+          || (resource.data.status == '下書き' && request.resource.data.status == '承認済み' && resource.data.certainty == '確定' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','revision','updatedBy','updatedAt']))
+          || (resource.data.status == '承認済み' && request.resource.data.status == '公開済み' && resource.data.certainty == '確定' && resource.data.releaseAt <= request.time && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','revision','updatedBy','updatedAt']) && !exists(/databases/$(database)/documents/publicEvents/$(event)/announcements/$(publication)) && existsAfter(/databases/$(database)/documents/publicEvents/$(event)/announcements/$(publication)))
+          || (resource.data.status == '公開済み' && request.resource.data.status == '下書き' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','revision','updatedBy','updatedAt']) && !existsAfter(/databases/$(database)/documents/publicEvents/$(event)/announcements/$(publication))));
+        allow delete: if false;
       }
       match /decisions/{decision} {
         allow read: if reader(event);
@@ -84,6 +103,20 @@ service cloud.firestore {
             && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status','progress','nextAction','revision','updatedBy','updatedAt'])));
         allow delete: if false;
       }
+    }
+    match /publicEvents/{event}/announcements/{publication} {
+      allow read: if true;
+      allow create: if admin(event) && request.resource.data.keys().hasOnly(['eventId','title','body','category','publishedAt']) && request.resource.data.keys().hasAll(['eventId','title','body','category','publishedAt'])
+        && request.resource.data.eventId == event && request.resource.data.publishedAt == request.time
+        && get(/databases/$(database)/documents/events/$(event)/publications/$(publication)).data.status == '承認済み'
+        && get(/databases/$(database)/documents/events/$(event)/publications/$(publication)).data.certainty == '確定'
+        && get(/databases/$(database)/documents/events/$(event)/publications/$(publication)).data.releaseAt <= request.time
+        && getAfter(/databases/$(database)/documents/events/$(event)/publications/$(publication)).data.status == '公開済み'
+        && request.resource.data.title == getAfter(/databases/$(database)/documents/events/$(event)/publications/$(publication)).data.title
+        && request.resource.data.body == getAfter(/databases/$(database)/documents/events/$(event)/publications/$(publication)).data.body
+        && request.resource.data.category == getAfter(/databases/$(database)/documents/events/$(event)/publications/$(publication)).data.category;
+      allow update: if false;
+      allow delete: if admin(event) && get(/databases/$(database)/documents/events/$(event)/publications/$(publication)).data.status == '公開済み' && getAfter(/databases/$(database)/documents/events/$(event)/publications/$(publication)).data.status == '下書き';
     }
     match /{document=**} { allow read, write: if false; }
   }
